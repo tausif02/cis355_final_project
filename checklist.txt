@@ -1,0 +1,21 @@
+This is the list of things that will be graded. 
+0. Does NOT need to be hosted. You can just use XAMPP. But code must be on GitHub. 
+1. Login and Join. and Logout. 
+    a. I need an Admin user and a NonAdmin user. 
+    b. You must provide email and password for both persons. 
+    c. Export your Persons table. 
+2. Three complete CRUD applets. 
+   a. Persons (List, Create, Read, Update and Delete)
+   b. Issues (List, Create, Read, Update and Delete)
+   c. Comments (List, Create, Read, Update and Delete). 
+   The comments MUST appear in the issues detail screen. 
+   The comments might only appear in the issues detail screen. 
+3. There must be front end and back end security. 
+    a. Remove or grey-out buttons that should not be accessible 
+    if the user is not ADMIN or the user who added the record. 
+    b. Make sure data cannot be hacked on the front end by checking 
+    that user is admin or proper user on back end. 
+4. On issues list screen there should be a way to view ALL issues 
+   or just OPEN issues (default should be OPEN only)
+5. Extra credit: add column (person's name) , sort by columns, 
+   filter by name, create multi-page list
