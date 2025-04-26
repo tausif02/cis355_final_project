@@ -112,8 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $per_id = !empty($_POST['per_id']) ? $_POST['per_id'] : null;
 
         $sql = "UPDATE iss_issues 
-                SET short_description=?, long_description=?, open_date=?, close_date=?, priority=?, org=?, project=?, per_id=? 
-                WHERE id=?";
+        SET short_description=?, long_description=?, open_date=?, close_date=?, priority=?, org=?, project=?, per_id=? 
+        WHERE id=?";
+
         $stmt = $pdo->prepare($sql);
 
         try {
@@ -372,7 +373,7 @@ $sort = isset($_GET['sort']) ? $_GET['sort'] : 'open_date';
 $order = isset($_GET['order']) ? $_GET['order'] : 'ASC';
 
 // Modifying the ORDER BY clause for sorting priority
-$allowedSorts = ['id', 'short_description', 'open_date', 'close_date', 'priority'];
+$allowedSorts = ['id', 'short_description', 'open_date', 'close_date', 'priority', 'responsible'];
 $sort = in_array($sort, $allowedSorts) ? $sort : 'open_date';
 $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC';
 
@@ -382,9 +383,12 @@ if ($sort === 'priority') {
     } else {
         $order_by_clause = "FIELD(i.priority, 'High', 'Medium', 'Low')";
     }
+} elseif ($sort === 'responsible') {
+    $order_by_clause = "responsible.lname $order, responsible.fname $order";
 } else {
     $order_by_clause = "i.$sort $order";
 }
+
 
 $limit = 10; // Number of issues per page
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -424,9 +428,12 @@ error_log("Page: $page, Offset: $offset, Limit: $limit, Total Pages: $total_page
 error_log("Page: $page, Offset: $offset, Limit: $limit, Total Pages: $total_pages");
 
 // Adjusting the SQL query based on the filter
-$sql = "SELECT i.*, p.fname, p.lname 
+$sql = "SELECT i.*, 
+               creator.fname AS creator_fname, creator.lname AS creator_lname,
+               responsible.fname AS responsible_fname, responsible.lname AS responsible_lname
         FROM iss_issues i
-        LEFT JOIN iss_persons p ON i.per_id = p.id
+        LEFT JOIN iss_persons creator ON i.created_by = creator.id
+        LEFT JOIN iss_persons responsible ON i.per_id = responsible.id
         WHERE (i.short_description LIKE :search OR i.long_description LIKE :search)";
 
 if ($filter === 'open') {
@@ -610,6 +617,11 @@ error_log("Issues: " . print_r($issues, true));
                             </a>
                         </th>
                         <th>
+                            <a href="issues_list.php?filter=<?= $filter ?>&sort=responsible&order=<?= ($sort === 'responsible' && $order === 'ASC') ? 'DESC' : 'ASC' ?>" class="text-white" style="text-decoration: none;">
+                                Responsible <?= $sort === 'responsible' ? ($order === 'ASC' ? '▲' : '▼') : '' ?>
+                            </a>
+                        </th>
+                        <th>
                             <a href="issues_list.php?filter=<?= $filter ?>&sort=open_date&order=<?= ($sort === 'open_date' && $order === 'ASC') ? 'DESC' : 'ASC' ?>" class="text-white" style="text-decoration: none;">
                                 Open Date <?= $sort === 'open_date' ? ($order === 'ASC' ? '▲' : '▼') : '' ?>
                             </a>
@@ -663,34 +675,47 @@ error_log("Issues: " . print_r($issues, true));
                         <tr>
                             <td><?= htmlspecialchars($issue['id']); ?></td>
                             <td><?= htmlspecialchars($issue['short_description']); ?></td>
-                            <td><?= htmlspecialchars($issue['open_date']); ?></td>
-                            <td><?= htmlspecialchars($issue['close_date']); ?></td>
-                            <td class="text-start">
+                            <td>
                                 <?php
-                                $priority = $issue['priority'];
-                                $badgeClass = '';
-                                $dotColor = '';
-
-                                switch ($priority) {
-                                    case 'High':
-                                        $badgeClass = 'bg-danger';
-                                        $dotColor = 'bg-danger';
-                                        break;
-                                    case 'Medium':
-                                        $badgeClass = 'bg-warning text-dark';
-                                        $dotColor = 'bg-warning';
-                                        break;
-                                    case 'Low':
-                                        $badgeClass = 'bg-success';
-                                        $dotColor = 'bg-success';
-                                        break;
+                                if (!empty($issue['responsible_fname']) && !empty($issue['responsible_lname'])) {
+                                    echo htmlspecialchars($issue['responsible_lname'] . ', ' . $issue['responsible_fname']);
+                                } else {
+                                    echo "-";
                                 }
                                 ?>
+                            </td>
+                            <td><?= htmlspecialchars($issue['open_date']); ?></td>
+                            <td><?= htmlspecialchars($issue['close_date']); ?></td>
+
+                            <?php
+                            $priority = $issue['priority'];
+                            switch ($priority) {
+                                case 'High':
+                                    $badgeClass = 'bg-danger';
+                                    $dotColor = 'bg-danger';
+                                    break;
+                                case 'Medium':
+                                    $badgeClass = 'bg-warning text-dark';
+                                    $dotColor = 'bg-warning';
+                                    break;
+                                case 'Low':
+                                    $badgeClass = 'bg-success';
+                                    $dotColor = 'bg-success';
+                                    break;
+                                default:
+                                    $badgeClass = 'bg-secondary';
+                                    $dotColor = 'bg-secondary';
+                                    break;
+                            }
+                            ?>
+
+                            <td class="text-start">
                                 <span class="d-inline-flex align-items-center gap-2">
                                     <span class="dot-indicator <?= $dotColor ?>"></span>
-                                    <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($priority); ?></span>
+                                    <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($priority); ?></span> <!-- This line was missing -->
                                 </span>
                             </td>
+
                             <td>
                                 <!-- Read Button -->
                                 <button class="btn btn-outline-info btn-sm custom-btn" data-bs-toggle="modal" data-bs-target="#readIssue<?= $issue['id']; ?>" title="Read" aria-label="Read Issue <?= $issue['id']; ?>">
@@ -800,7 +825,15 @@ error_log("Issues: " . print_r($issues, true));
                                         </div>
                                         <div class="mb-2"><strong>Organization:</strong> <?= htmlspecialchars($issue['org']); ?></div>
                                         <div class="mb-2"><strong>Project:</strong> <?= htmlspecialchars($issue['project']); ?></div>
-                                        <div class="mb-3"><strong>Person:</strong> <?= htmlspecialchars($issue['lname'] . ', ' . $issue['fname']); ?></div>
+                                        <div class="mb-3"><strong>Person:</strong>
+                                            <?php
+                                            if (!empty($issue['responsible_lname']) && !empty($issue['responsible_fname'])) {
+                                                echo htmlspecialchars($issue['responsible_lname'] . ', ' . $issue['responsible_fname']);
+                                            } else {
+                                                echo "-";
+                                            }
+                                            ?>
+                                        </div>
 
                                         <!-- Comments Section -->
                                         <h5 class="mb-3 mt-4">Comments</h5>
@@ -937,7 +970,6 @@ error_log("Issues: " . print_r($issues, true));
                 <div class="modal-body">
                     <form method="POST">
                         <input type="hidden" name="id" value="<?= $issue['id']; ?>">
-                        <input type="hidden" name="per_id" value="<?= $issue['per_id']; ?>">
                         <input type="hidden" name="created_by" value="<?= $issue['created_by']; ?>">
 
                         <div class="mb-2">
@@ -973,12 +1005,17 @@ error_log("Issues: " . print_r($issues, true));
                         </div>
 
                         <div class="mb-3">
-                            <select name="per_id" class="form-select border-0 shadow-sm rounded">
+                        <select name="per_id" class="form-select border-0 shadow-sm rounded"
+    <?= (!($_SESSION['admin'] === "Y" || $_SESSION['user_id'] == $issue['created_by'])) ? 'disabled' : '' ?>>
                                 <option value="">-- Select Person --</option>
                                 <?php foreach ($persons as $person): ?>
                                     <option value="<?= $person['id']; ?>" <?= $issue['per_id'] == $person['id'] ? 'selected' : ''; ?>>
                                         <?= htmlspecialchars($person['lname'] . ', ' . $person['fname']); ?>
                                     </option>
+                                    <?php if ($_SESSION['user_id'] != $issue['created_by']): ?>
+                                        <div class="text-muted small mt-1">Only the issue creator can update the person responsible.</div>
+                                    <?php endif; ?>
+
                                 <?php endforeach; ?>
                             </select>
                         </div>
